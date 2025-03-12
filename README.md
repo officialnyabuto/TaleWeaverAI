@@ -67,8 +67,8 @@ An AI-powered framework for generating culturally authentic African children's b
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/african-stories-ai.git
-   cd african-stories-ai
+   git clone https://github.com/yourusername/TaleWeaverAi.git
+   cd TaleWeaverAi
    ```
 
 2. **Install dependencies**
@@ -180,7 +180,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - African cultural experts and educators
 - Open-source AI community
 - Children's literature specialists
-
-## 📞 Support
-
-For support, email support@africanstoriesai.com or join our [Discord community](https://discord.gg/africanstoriesai).
