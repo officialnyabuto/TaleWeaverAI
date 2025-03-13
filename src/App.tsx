@@ -12,11 +12,28 @@ import {
   Users,
   Wand2,
   FileCheck,
+  HelpCircle,
 } from 'lucide-react';
+import { Tooltip } from './components/Tooltip';
+import { ProgressBar } from './components/ProgressBar';
+import { StoryEditor } from './components/StoryEditor';
+import { useStoryStore } from './store/storyStore';
+import { z } from 'zod';
+
+const parameterSchema = z.object({
+  theme: z.string().min(1, "Theme is required"),
+  ageGroup: z.string().min(1, "Age group is required"),
+  tone: z.string().min(1, "Tone is required"),
+  setting: z.string().min(1, "Setting is required"),
+  length: z.string().min(1, "Length is required"),
+  region: z.string().min(1, "Region is required"),
+  accuracy: z.string().min(1, "Accuracy level is required"),
+});
 
 interface Parameter {
   name: string;
   options: string[];
+  description: string;
 }
 
 interface Agent {
@@ -27,8 +44,18 @@ interface Agent {
 }
 
 function App() {
+  const { 
+    isGenerating, 
+    currentStory, 
+    generationProgress, 
+    error,
+    parameters,
+    setParameters,
+    generateStory
+  } = useStoryStore();
+
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const [selectedParameters, setSelectedParameters] = useState<Record<string, string>>({});
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const agents: Agent[] = [
     {
@@ -39,22 +66,27 @@ function App() {
         {
           name: 'Theme',
           options: ['Folktale', 'Fantasy', 'Sci-Fi', 'Adventure', 'Historical', 'Contemporary'],
+          description: 'The main genre and style of the story',
         },
         {
           name: 'Age Group',
           options: ['3-5', '6-8', '9-12'],
+          description: 'Target age range for the story',
         },
         {
           name: 'Tone',
           options: ['Lighthearted', 'Dramatic', 'Educational', 'Emotional'],
+          description: 'The emotional feel and atmosphere of the story',
         },
         {
           name: 'Setting',
           options: ['Urban', 'Rural', 'Ancient', 'Futuristic'],
+          description: 'The world where the story takes place',
         },
         {
           name: 'Length',
           options: ['Short story', 'Chapter book'],
+          description: 'The overall length and format of the story',
         },
       ],
     },
@@ -66,10 +98,12 @@ function App() {
         {
           name: 'Region',
           options: ['West Africa', 'East Africa', 'North Africa', 'South Africa', 'Central Africa'],
+          description: 'The specific African region to focus on',
         },
         {
           name: 'Accuracy',
           options: ['Strict', 'Creative'],
+          description: 'Level of adherence to cultural authenticity',
         },
       ],
     },
@@ -81,10 +115,12 @@ function App() {
         {
           name: 'Type',
           options: ['Human', 'Animal', 'Mythical Creature', 'AI Companion'],
+          description: 'The nature of the characters',
         },
         {
           name: 'Diversity',
           options: ['Gender-balanced', 'Neurodiverse', 'Differently-abled'],
+          description: 'Character representation and inclusivity',
         },
       ],
     },
@@ -96,10 +132,12 @@ function App() {
         {
           name: 'Complexity',
           options: ['Simple', 'Multi-threaded', 'Twist ending'],
+          description: 'The intricacy of the plot structure',
         },
         {
           name: 'Arc',
           options: ["Hero's Journey", 'Tragedy', 'Coming-of-Age'],
+          description: 'The type of story arc to follow',
         },
       ],
     },
@@ -111,10 +149,12 @@ function App() {
         {
           name: 'Ecosystem',
           options: ['Savanna', 'Rainforest', 'Desert', 'Coastal', 'Urban'],
+          description: 'The environmental setting of the story',
         },
         {
           name: 'Mythology',
           options: ['None', 'Light References', 'Heavy Influence'],
+          description: 'Integration of mythological elements',
         },
       ],
     },
@@ -126,10 +166,12 @@ function App() {
         {
           name: 'Language',
           options: ['English', 'Swahili', 'Yoruba', 'Amharic', 'Multilingual'],
+          description: 'The primary language(s) used in the story',
         },
         {
           name: 'Style',
           options: ['Formal', 'Playful', 'Poetic', 'Proverbs'],
+          description: 'The style of dialogue and communication',
         },
       ],
     },
@@ -141,10 +183,12 @@ function App() {
         {
           name: 'Focus',
           options: ['STEM', 'History', 'Ethics', 'Emotional Intelligence'],
+          description: 'The educational focus of the story',
         },
         {
           name: 'Style',
           options: ['Implicit', 'Explicit'],
+          description: 'How educational content is presented',
         },
       ],
     },
@@ -156,14 +200,17 @@ function App() {
         {
           name: 'Style',
           options: ['Traditional African Art', 'Watercolor', 'Comic-Style', 'Digital Painting'],
+          description: 'The artistic style of illustrations',
         },
         {
           name: 'Palette',
           options: ['Warm & Vibrant', 'Earthy & Natural', 'Monochrome'],
+          description: 'The color scheme of illustrations',
         },
         {
           name: 'Detail',
           options: ['Minimalist', 'Detailed', 'Hyper-realistic'],
+          description: 'The level of detail in illustrations',
         },
       ],
     },
@@ -175,6 +222,7 @@ function App() {
         {
           name: 'Strictness',
           options: ['Loose', 'Medium', 'High'],
+          description: 'Level of consistency enforcement',
         },
       ],
     },
@@ -186,20 +234,48 @@ function App() {
         {
           name: 'Level',
           options: ['Basic', 'In-depth'],
+          description: 'Depth of quality review',
         },
         {
           name: 'Human Review',
           options: ['Yes', 'No', 'Optional'],
+          description: 'Whether human review is included',
         },
       ],
     },
   ];
 
-  const handleParameterChange = (agentName: string, paramName: string, value: string) => {
-    setSelectedParameters((prev) => ({
-      ...prev,
-      [`${agentName}-${paramName}`]: value,
-    }));
+  const handleParameterChange = async (agentName: string, paramName: string, value: string) => {
+    const paramKey = `${agentName}-${paramName}`;
+    setParameters({ [paramKey]: value });
+
+    try {
+      await parameterSchema.parseAsync(parameters);
+      setValidationErrors({});
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        const errors: Record<string, string> = {};
+        err.errors.forEach((error) => {
+          errors[error.path[0]] = error.message;
+        });
+        setValidationErrors(errors);
+      }
+    }
+  };
+
+  const handleGenerateStory = async () => {
+    try {
+      await parameterSchema.parseAsync(parameters);
+      await generateStory();
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        const errors: Record<string, string> = {};
+        err.errors.forEach((error) => {
+          errors[error.path[0]] = error.message;
+        });
+        setValidationErrors(errors);
+      }
+    }
   };
 
   return (
@@ -226,6 +302,18 @@ function App() {
           </p>
         </div>
 
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
+            {error}
+          </div>
+        )}
+
+        {isGenerating && (
+          <div className="mb-6">
+            <ProgressBar progress={generationProgress} status="Generating your story..." />
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {agents.map((agent) => (
             <div
@@ -240,17 +328,27 @@ function App() {
                   {agent.icon}
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900">{agent.name}</h3>
+                <Tooltip content={agent.description}>
+                  <HelpCircle className="w-5 h-5 text-gray-400" />
+                </Tooltip>
               </div>
-              <p className="text-gray-600 mb-4">{agent.description}</p>
+              
               <div className="space-y-4">
                 {agent.parameters.map((param) => (
                   <div key={param.name} className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
                       {param.name}
+                      <Tooltip content={param.description}>
+                        <HelpCircle className="inline-block w-4 h-4 ml-1 text-gray-400" />
+                      </Tooltip>
                     </label>
                     <select
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm"
-                      value={selectedParameters[`${agent.name}-${param.name}`] || ''}
+                      className={`block w-full rounded-md shadow-sm sm:text-sm ${
+                        validationErrors[param.name]
+                          ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                          : 'border-gray-300 focus:ring-orange-500 focus:border-orange-500'
+                      }`}
+                      value={parameters[`${agent.name}-${param.name}`] || ''}
                       onChange={(e) => handleParameterChange(agent.name, param.name, e.target.value)}
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -261,6 +359,9 @@ function App() {
                         </option>
                       ))}
                     </select>
+                    {validationErrors[param.name] && (
+                      <p className="mt-1 text-sm text-red-600">{validationErrors[param.name]}</p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -268,46 +369,20 @@ function App() {
           ))}
         </div>
 
-        <div className="mt-12 bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-2xl font-bold text-gray-900 mb-4">Workflow Status</h3>
-          <div className="space-y-4">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="w-5 h-5 text-white" />
-              </div>
-              <div className="ml-4">
-                <p className="font-medium">Pre-Story Ideation & User Input</p>
-                <p className="text-sm text-gray-500">Define key parameters</p>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
-                <Settings2 className="w-5 h-5 text-white" />
-              </div>
-              <div className="ml-4">
-                <p className="font-medium">Narrative Development</p>
-                <p className="text-sm text-gray-500">Interactive story generation</p>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                <Palette className="w-5 h-5 text-white" />
-              </div>
-              <div className="ml-4">
-                <p className="font-medium">Visual Generation & Refinement</p>
-                <p className="text-sm text-gray-500">Illustration creation</p>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                <FileCheck className="w-5 h-5 text-white" />
-              </div>
-              <div className="ml-4">
-                <p className="font-medium">Post-Processing & Publication</p>
-                <p className="text-sm text-gray-500">Final compilation</p>
-              </div>
-            </div>
+        {currentStory && (
+          <div className="mt-8">
+            <StoryEditor story={currentStory} onSave={(story) => console.log('Save story:', story)} />
           </div>
+        )}
+
+        <div className="mt-8 flex justify-center">
+          <button
+            onClick={handleGenerateStory}
+            disabled={isGenerating || Object.keys(validationErrors).length > 0}
+            className="px-6 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isGenerating ? 'Generating...' : 'Generate Story'}
+          </button>
         </div>
       </main>
     </div>
@@ -315,5 +390,3 @@ function App() {
 }
 
 export default App;
-
-export default App
