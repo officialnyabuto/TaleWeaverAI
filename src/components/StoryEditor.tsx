@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Story } from '../services/api';
 import { Slider } from '@radix-ui/react-slider';
 import { Save, Undo } from 'lucide-react';
+import { ExportDialog } from './ExportDialog';
 
 interface StoryEditorProps {
   story: Story;
@@ -64,6 +65,7 @@ export const StoryEditor: React.FC<StoryEditorProps> = ({ story, onSave }) => {
             <Save className="w-4 h-4" />
             <span>Save Changes</span>
           </button>
+          <ExportDialog story={editedStory} />
         </div>
       </div>
 
